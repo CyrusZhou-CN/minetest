@@ -2026,6 +2026,17 @@ that acts as tool in a gameplay sense as a craftitem, and vice-versa.
 Craftitems can be used for items that neither need to be a node
 nor a tool.
 
+Special Items
+-------------
+The following items are predefined and have special properties.
+
+* `"unknown"`: An item that represents every item which has not been registered
+* `"air"`: The node which appears everywhere where no other node is
+* `"ignore"`: Mapblocks which have not been yet generated consist of this node
+* `""`: The player's hand, which is in use whenever the player wields no item
+  * Its rage and tool capabilities are also used as an fallback for the wield item
+  * It can be overridden to change those properties
+
 Amount and wear
 ---------------
 
@@ -3768,7 +3779,8 @@ Player Inventory lists
 * `craftresult`: list containing the crafted output
 * `hand`: list containing an override for the empty hand
     * Is not created automatically, use `InvRef:set_size`
-    * Is only used to enhance the empty hand's tool capabilities
+    * Players use the first item in this list as their hand
+    * It behaves as if the default hand `""` has been overridden for this specific player
 
 Custom lists can be added and deleted with `InvRef:set_size(name, size)` like
 any other inventory.
