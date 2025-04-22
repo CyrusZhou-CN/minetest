@@ -518,6 +518,15 @@ stripping out the file extension:
 
 Supported texture formats are PNG (`.png`), JPEG (`.jpg`) and Targa (`.tga`).
 
+Luanti generally uses nearest-neighbor upscaling for textures to preserve the crisp
+look of pixel art (low-res textures).
+Users can optionally enable bilinear and/or trilinear filtering. However, to avoid
+everything becoming blurry, textures smaller than 192px will either not be filtered,
+or will be upscaled to that minimum resolution first without filtering.
+
+This is subject to change to move more control to the Lua API, but you can rely on
+low-res textures not suddenly becoming filtered.
+
 Texture modifiers
 -----------------
 
@@ -2833,6 +2842,9 @@ Version History
   * Add field_enter_after_edit[] (experimental)
 * Formspec version 8 (5.10.0)
   * scroll_container[]: content padding parameter
+* Formspec version 9 (5.12.0)
+  * Add allow_close[]
+  * label[]: Add "area label" variant
 
 Elements
 --------
@@ -3145,9 +3157,11 @@ Elements
 ### `textarea[<X>,<Y>;<W>,<H>;<name>;<label>;<default>]`
 
 * Same as fields above, but with multi-line input
+* Text is wrapped to fit within the given bounds.
 * If the text overflows, a vertical scrollbar is added.
 * If the name is empty, the textarea is read-only and
   the background is not shown, which corresponds to a multi-line label.
+  See also `label[<X>,<Y>;<W>,<H>;<label>]` for an alternative.
 
 ### `label[<X>,<Y>;<label>]`
 
@@ -3161,6 +3175,16 @@ Elements
 * **Note**: With the new coordinate system, newlines are spaced with
   half a coordinate.  With the old system, newlines are spaced 2/5 of
   an inventory slot.
+
+### `label[<X>,<Y>;<W>,<H>;<label>]`
+
+* The "area label" formspec element displays the text set in `label`
+  at the specified position and size.
+* Text is wrapped to fit within the given bounds.
+* If the text overflows, it is currently simply truncated, but this behavior is
+  subject to change. There is no scrollbar.
+* See also `textarea` for an alternative.
+* Only available with the new coordinate system.
 
 ### `hypertext[<X>,<Y>;<W>,<H>;<name>;<text>]`
 * Displays a static formatted text with hyperlinks.
