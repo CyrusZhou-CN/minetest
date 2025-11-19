@@ -17,8 +17,6 @@
 
 #include "COGLESCoreExtensionHandler.h"
 
-namespace irr
-{
 namespace video
 {
 
@@ -78,6 +76,8 @@ public:
 			return TextureMultisampleSupported;
 		case EVDF_TEXTURE_2D_ARRAY:
 			return Texture2DArraySupported;
+		case EVDF_RENDER_TO_FLOAT_TEXTURE:
+			return RenderToFloatTextureSupported;
 		default:
 			return false;
 		};
@@ -180,8 +180,8 @@ public:
 	bool TextureMultisampleSupported = false;
 	bool Texture2DArraySupported = false;
 	bool KHRDebugSupported = false;
+	bool RenderToFloatTextureSupported = false;
 	u32 MaxLabelLength = 0;
 };
 
-}
 }

@@ -4,20 +4,22 @@
 
 #include "chatmessage.h"
 #include "server.h"
+#include "serverenvironment.h"
 #include "log.h"
 #include "emerge.h"
+#include "itemdef.h"
 #include "mapblock.h"
 #include "modchannels.h"
 #include "nodedef.h"
+#include "porting.h" // strcasecmp
 #include "remoteplayer.h"
 #include "rollback_interface.h"
 #include "scripting_server.h"
 #include "serialization.h"
 #include "settings.h"
 #include "tool.h"
-#include "version.h"
-#include "irrlicht_changes/printing.h"
 #include "network/connection.h"
+#include "network/networkexceptions.h"
 #include "network/networkpacket.h"
 #include "network/networkprotocol.h"
 #include "network/serveropcodes.h"
@@ -26,7 +28,6 @@
 #include "util/auth.h"
 #include "util/base64.h"
 #include "util/pointedthing.h"
-#include "util/serialize.h"
 #include "util/srp.h"
 #include "clientdynamicinfo.h"
 
@@ -34,8 +35,9 @@
 
 void Server::handleCommand_Deprecated(NetworkPacket* pkt)
 {
-	infostream << "Server: " << toServerCommandTable[pkt->getCommand()].name
-		<< " not supported anymore" << std::endl;
+	auto &h = toServerCommandTable[pkt->getCommand()];
+	infostream << "Server: ignoring unsupported " << h.name << " from peer " <<
+		pkt->getPeerId() << std::endl;
 }
 
 void Server::handleCommand_Init(NetworkPacket* pkt)
@@ -55,8 +57,8 @@ void Server::handleCommand_Init(NetworkPacket* pkt)
 		 * respond for some time, your server was overloaded or
 		 * things like that.
 		 */
-		infostream << "Server::ProcessData(): Canceling: peer " << peer_id <<
-			" not found" << std::endl;
+		infostream << "Server: peer " << peer_id << " not found during INIT?!"
+			<< std::endl;
 		return;
 	}
 
@@ -1172,11 +1174,6 @@ void Server::handleCommand_Interact(NetworkPacket *pkt)
 		std::optional<ItemStack> selected_item;
 		getWieldedItem(playersao, selected_item);
 
-		// Reset build time counter
-		if (pointed.type == POINTEDTHING_NODE &&
-				selected_item->getDefinition(m_itemdef).type == ITEM_NODE)
-			getClient(peer_id)->m_time_from_building = 0.0;
-
 		const bool had_prediction = !selected_item->getDefinition(m_itemdef).
 			node_placement_prediction.empty();
 
@@ -1197,6 +1194,10 @@ void Server::handleCommand_Interact(NetworkPacket *pkt)
 					SendInventory(player, true);
 			}
 
+			// on_secondary_use might have removed the object
+			if (pointed_object->isGone())
+				return;
+
 			pointed_object->rightClick(playersao);
 		} else if (m_script->item_OnPlace(selected_item, playersao, pointed)) {
 			// Placement was handled in lua
@@ -1208,6 +1209,8 @@ void Server::handleCommand_Interact(NetworkPacket *pkt)
 
 		if (pointed.type != POINTEDTHING_NODE)
 			return;
+
+		getClient(peer_id)->m_time_from_building = 0;
 
 		// If item has node placement prediction, always send the
 		// blocks to make sure the client knows what exactly happened
@@ -1363,22 +1366,11 @@ void Server::handleCommand_InventoryFields(NetworkPacket* pkt)
 	session_t peer_id = pkt->getPeerId();
 	RemotePlayer *player = m_env->getPlayer(peer_id);
 
-	if (player == NULL) {
-		errorstream <<
-			"Server::ProcessData(): Canceling: No player for peer_id=" <<
-			peer_id << " disconnecting peer!" << std::endl;
-		DisconnectPeer(peer_id);
+	if (!player)
 		return;
-	}
-
 	PlayerSAO *playersao = player->getPlayerSAO();
-	if (playersao == NULL) {
-		errorstream <<
-			"Server::ProcessData(): Canceling: No player object for peer_id=" <<
-			peer_id << " disconnecting peer!" << std::endl;
-		DisconnectPeer(peer_id);
+	if (!playersao)
 		return;
-	}
 
 	std::string client_formspec_name;
 	StringMap fields;
@@ -1480,7 +1472,7 @@ void Server::handleCommand_FirstSrp(NetworkPacket* pkt)
 		acceptAuth(peer_id, false);
 	} else {
 		if (cstate < CS_SudoMode) {
-			infostream << "Server::ProcessData(): Ignoring TOSERVER_FIRST_SRP from "
+			infostream << "Server: Ignoring TOSERVER_FIRST_SRP from "
 					<< addr_s << ": " << "Client has wrong state " << cstate << "."
 					<< std::endl;
 			return;

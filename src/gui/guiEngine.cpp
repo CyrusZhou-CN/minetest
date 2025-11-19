@@ -7,8 +7,6 @@
 #include "client/fontengine.h"
 #include "client/guiscalingfilter.h"
 #include "client/renderingengine.h"
-#include "client/shader.h"
-#include "client/tile.h"
 #include "clientdynamicinfo.h"
 #include "config.h"
 #include "content/content.h"
@@ -21,8 +19,6 @@
 #include "porting.h"
 #include "scripting_mainmenu.h"
 #include "settings.h"
-#include "sound.h"
-#include "version.h"
 #include <ICameraSceneNode.h>
 #include <IGUIStaticText.h>
 #include "client/imagefilters.h"
@@ -215,7 +211,7 @@ std::string findLocaleFileWithExtension(const std::string &path)
 /******************************************************************************/
 std::string findLocaleFileInMods(const std::string &path, const std::string &filename_no_ext)
 {
-	std::vector<ModSpec> mods = flattenMods(getModsInPath(path, "root", true));
+	std::vector<ModSpec> mods = flattenMods(getModsInPath(path, "root", 0));
 
 	for (const auto &mod : mods) {
 		std::string ret = findLocaleFileWithExtension(
@@ -317,7 +313,7 @@ void GUIEngine::run()
 				fog_end, fog_density, fog_pixelfog, fog_rangefog);
 	}
 
-	const irr::core::dimension2d<u32> initial_screen_size(
+	const core::dimension2d<u32> initial_screen_size(
 			g_settings->getU16("screen_w"),
 			g_settings->getU16("screen_h")
 		);

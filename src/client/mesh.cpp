@@ -5,15 +5,13 @@
 #include "mesh.h"
 #include "IMeshBuffer.h"
 #include "SSkinMeshBuffer.h"
+#include "constants.h"
 #include "debug.h"
-#include "log.h"
 #include <cmath>
-#include <iostream>
 #include <IAnimatedMesh.h>
-#include <IAnimatedMeshSceneNode.h>
 #include "S3DVertex.h"
 #include <SMesh.h>
-#include "SMeshBuffer.h"
+#include "CMeshBuffer.h"
 
 inline static void applyShadeFactor(video::SColor& color, float factor)
 {

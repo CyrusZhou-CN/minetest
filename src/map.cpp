@@ -13,10 +13,9 @@
 #include "profiler.h"
 #include "nodedef.h"
 #include "gamedef.h"
-#include "util/directiontables.h"
 #include "rollback_interface.h"
 #include "environment.h"
-#include "irrlicht_changes/printing.h"
+#include <queue>
 
 /*
 	Map
@@ -30,11 +29,22 @@ Map::Map(IGameDef *gamedef):
 
 Map::~Map()
 {
-	/*
-		Free all MapSectors
-	*/
+	// Free all sectors
+	size_t used = 0;
 	for (auto &sector : m_sectors) {
+		sector.second->deleteBlocks(&used);
 		delete sector.second;
+	}
+	m_sectors.clear();
+
+	if (used > 0) {
+#ifdef NDEBUG
+		std::ostream &to = infostream;
+#else
+		std::ostream &to = warningstream;
+#endif
+		PrintInfo(to);
+		to << used << " blocks deleted despite reference count > 0. Potential bug." << std::endl;
 	}
 }
 
@@ -764,12 +774,10 @@ void MMVManip::initialEmerge(v3s16 p_min, v3s16 p_max, bool load_if_inexistent)
 			(p_min*MAP_BLOCKSIZE, (p_max+1)*MAP_BLOCKSIZE-v3s16(1,1,1));
 
 	u32 size_MB = block_area_nodes.getVolume() * sizeof(MapNode) / 1000000U;
-	if(size_MB >= 1)
-	{
-		infostream<<"initialEmerge: area: ";
+	if (size_MB >= 4) {
+		infostream << "initialEmerge: area: ";
 		block_area_nodes.print(infostream);
-		infostream<<" ("<<size_MB<<"MB)";
-		infostream<<std::endl;
+		infostream << " (" << size_MB << "MB)" << std::endl;
 	}
 
 	std::map<v3s16, bool> had_blocks;

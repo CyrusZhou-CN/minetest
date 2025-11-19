@@ -9,8 +9,6 @@
 #include "IMeshBuffer.h"
 #include "aabbox3d.h"
 
-namespace irr
-{
 namespace scene
 {
 //! Simple implementation of the IMesh interface.
@@ -28,7 +26,7 @@ struct SMesh final : public IAnimatedMesh
 	}
 
 	//! clean mesh
-	virtual void clear()
+	void clear()
 	{
 		for (auto *buf : MeshBuffers)
 			buf->drop();
@@ -146,4 +144,3 @@ struct SMesh final : public IAnimatedMesh
 };
 
 } // end namespace scene
-} // end namespace irr

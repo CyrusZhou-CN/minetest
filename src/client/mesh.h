@@ -4,19 +4,20 @@
 
 #pragma once
 
-#include "SColor.h"
-#include "SMaterialLayer.h"
-#include "nodedef.h"
+#include "irrlichttypes_bloated.h"
 
-namespace irr {
-	namespace scene {
-		class IAnimatedMesh;
-		class IMesh;
-		class IMeshBuffer;
-	}
+namespace scene {
+	class IAnimatedMesh;
+	class IMesh;
+	class IMeshBuffer;
+	struct SMesh;
 }
 
-using namespace irr;
+namespace video {
+	class SMaterialLayer;
+	class SColor;
+}
+
 
 /*!
  * Applies shading to a color based on the surface's

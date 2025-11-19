@@ -6,7 +6,7 @@
 
 #include "IAnimatedMesh.h"
 #include "ISceneManager.h"
-#include "SMeshBuffer.h"
+#include "CMeshBuffer.h"
 #include "SSkinMeshBuffer.h"
 #include "aabbox3d.h"
 #include "irrMath.h"
@@ -21,12 +21,10 @@
 #include <variant>
 #include <vector>
 
-namespace irr
-{
 namespace scene
 {
 
-class IAnimatedMeshSceneNode;
+class AnimatedMeshSceneNode;
 class IBoneSceneNode;
 class ISceneManager;
 
@@ -153,7 +151,7 @@ public:
 
 	//! Creates an array of joints from this mesh as children of node
 	std::vector<IBoneSceneNode *> addJoints(
-			IAnimatedMeshSceneNode *node, ISceneManager *smgr);
+			AnimatedMeshSceneNode *node, ISceneManager *smgr);
 
 	//! A vertex weight
 	struct SWeight
@@ -447,4 +445,3 @@ public:
 };
 
 } // end namespace scene
-} // end namespace irr

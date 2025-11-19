@@ -6,7 +6,6 @@
 #include "porting.h" // for sleep_ms(), get_sysinfo(), secure_rand_fill_buf()
 #include <list>
 #include <unordered_map>
-#include <cerrno>
 #include <mutex>
 #include "threading/event.h"
 #include "config.h"
@@ -402,6 +401,8 @@ const HTTPFetchResult * HTTPFetchOngoing::complete(CURLcode res)
 HTTPFetchOngoing::~HTTPFetchOngoing()
 {
 	if (multi) {
+		// Note: this can block if curl is stuck waiting for DNS, see
+		// <https://github.com/luanti-org/luanti/issues/16272>
 		CURLMcode mres = curl_multi_remove_handle(multi, curl);
 		if (mres != CURLM_OK) {
 			errorstream << "curl_multi_remove_handle"
@@ -635,6 +636,8 @@ protected:
 		while (!stopRequested()) {
 			BEGIN_DEBUG_EXCEPTION_HANDLER
 
+			const u64 t0 = porting::getTimeMs();
+
 			/*
 				Handle new async requests
 			*/
@@ -666,6 +669,16 @@ protected:
 					msg = curl_multi_info_read(m_multi, &msgs_in_queue);
 				}
 			}
+
+			/*
+				If we took suspiciously long, warn.
+			*/
+			const u64 tdelta = porting::getTimeMs() - t0;
+			if (tdelta > 300) {
+				warningstream << "CurlFetchThread blocked for " << tdelta << "ms"
+					<< std::endl;
+			}
+
 
 			/*
 				If there are ongoing requests, wait for data
@@ -738,13 +751,7 @@ void httpfetch_async(const HTTPFetchRequest &fetch_request)
 
 static void httpfetch_request_clear(u64 caller)
 {
-	if (g_httpfetch_thread->isRunning()) {
-		Event event;
-		g_httpfetch_thread->requestClear(caller, &event);
-		event.wait();
-	} else {
-		g_httpfetch_thread->requestClear(caller, nullptr);
-	}
+	g_httpfetch_thread->requestClear(caller, nullptr);
 }
 
 bool httpfetch_sync_interruptible(const HTTPFetchRequest &fetch_request,

@@ -6,7 +6,6 @@
 
 #include "lua_api/l_base.h"
 
-class AsyncEngine;
 
 /** Implementation of lua api support for mainmenu */
 class ModApiMainMenu: public ModApiBase
@@ -58,6 +57,8 @@ private:
 	static int l_get_games(lua_State *L);
 
 	static int l_get_content_info(lua_State *L);
+
+	static int l_get_mod_list(lua_State *L);
 
 	static int l_check_mod_configuration(lua_State *L);
 
