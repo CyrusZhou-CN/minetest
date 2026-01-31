@@ -20,7 +20,7 @@
 #include "server.h"
 #include "serverenvironment.h"
 #include "settings.h"
-#include "hud.h"
+#include "hud_element.h"
 #include "server/luaentity_sao.h"
 #include "server/player_sao.h"
 #include "server/serverinventorymgr.h"
@@ -204,7 +204,7 @@ int ObjectRef::l_punch(lua_State *L)
 		return 0;
 
 	float time_from_last_punch = readParam<float>(L, 3, 1000000.0f);
-	ToolCapabilities toolcap = read_tool_capabilities(L, 4);
+	ToolCapabilities toolcap = read_tool_capabilities(L, 4); // not optional!
 	v3f dir;
 	if (puncher) {
 		dir = readParam<v3f>(L, 5, sao->getBasePosition() - puncher->getBasePosition());
@@ -213,7 +213,7 @@ int ObjectRef::l_punch(lua_State *L)
 		dir = readParam<v3f>(L, 5, v3f(0));
 	}
 
-	u32 wear = sao->punch(dir, &toolcap, puncher, time_from_last_punch);
+	u32 wear = sao->punch(dir, toolcap, puncher, time_from_last_punch);
 	lua_pushnumber(L, wear);
 
 	return 1;
@@ -2297,6 +2297,8 @@ int ObjectRef::l_get_sky(lua_State *L)
 	lua_setfield(L, -2, "fog_distance");
 	lua_pushnumber(L, skybox_params.fog_start >= 0 ? skybox_params.fog_start : -1.0f);
 	lua_setfield(L, -2, "fog_start");
+	push_ARGB8(L, skybox_params.fog_color);
+	lua_setfield(L, -2, "fog_color");
 	lua_setfield(L, -2, "fog");
 
 	return 1;
@@ -2452,6 +2454,7 @@ int ObjectRef::l_set_stars(lua_State *L)
 			"scale", star_params.scale);
 		star_params.day_opacity = getfloatfield_default(L, 2,
 			"day_opacity", star_params.day_opacity);
+		star_params.star_seed = getintfield_default(L, 2, "star_seed", star_params.star_seed);
 	}
 
 	getServer(L)->setStars(player, star_params);
@@ -2480,6 +2483,8 @@ int ObjectRef::l_get_stars(lua_State *L)
 	lua_setfield(L, -2, "scale");
 	lua_pushnumber(L, star_params.day_opacity);
 	lua_setfield(L, -2, "day_opacity");
+	lua_pushnumber(L, star_params.star_seed);
+	lua_setfield(L, -2, "star_seed");
 	return 1;
 }
 

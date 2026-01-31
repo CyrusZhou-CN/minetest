@@ -115,12 +115,12 @@
 [*General]
 
 #    Smooths rotation of camera, also called look or mouse smoothing. 0 to disable.
-camera_smoothing (Camera smoothing) float 0.0 0.0 0.99
+camera_smoothing (Camera smoothing) float 0.0 0.0 100.0
 
 #    Smooths rotation of camera when in cinematic mode, 0 to disable. Enter cinematic mode by using the key set in Controls.
 #
 #    Requires: keyboard_mouse
-cinematic_camera_smoothing (Camera smoothing in cinematic mode) float 0.7 0.0 0.99
+cinematic_camera_smoothing (Camera smoothing in cinematic mode) float 0.05 0.0 100.0
 
 #    If enabled, you can place nodes at the position (feet + eye level) where you stand.
 #    This is helpful when working with nodeboxes in small areas.
@@ -161,6 +161,9 @@ autojump (Automatic jumping) bool false
 #    Enable this when you dig or place too often by accident.
 #    On touchscreens, this only affects digging.
 safe_dig_and_place (Safe digging and placing) bool false
+
+#	 Enable a confirmation dialog before closing.
+enable_esc_dialog (Confirmation dialog before closing) bool true
 
 [*Keyboard and Mouse]
 
@@ -881,6 +884,9 @@ tooltip_append_itemname (Append item name) bool false
 
 #    Use a cloud animation for the main menu background.
 menu_clouds (Clouds in menu) bool true
+
+#    Choose theme colors for the main menu background.
+menu_theme (Menu theme) enum light dark,light
 
 [**HUD]
 
@@ -1887,6 +1893,10 @@ mgvalleys_np_dungeons (Dungeon noise) noise_params_3d 0.9, 0.5, (500, 500, 500),
 #    This support is experimental and API can change.
 enable_client_modding (Client modding) [client] bool false
 
+#    Where to enable server-sent client-side modding (SSCSM).
+#    Warning: Experimental.
+enable_sscsm (Enable SSCSM) [client] enum nowhere nowhere,singleplayer,localhost,lan,everywhere
+
 #    Replaces the default main menu with a custom one.
 main_menu_script (Main menu script) [client] string
 
@@ -2115,10 +2125,10 @@ font_bold (Font bold by default) bool false
 
 font_italic (Font italic by default) bool false
 
-#    Shadow offset (in pixels) of the default font. If 0, then shadow will not be drawn.
-font_shadow (Font shadow) int 1 0 65535
+#    Shadow offset (in pixels) for all fonts. If 0, then no shadow will be drawn.
+font_shadow (Font shadow) int 1 0 255
 
-#    Opaqueness (alpha) of the shadow behind the default font, between 0 and 255.
+#    Opaqueness (alpha) of the shadow behind the font.
 font_shadow_alpha (Font shadow alpha) int 127 0 255
 
 #    Font size of the default font where 1 unit = 1 pixel at 96 DPI
@@ -2382,6 +2392,10 @@ num_emerge_threads (Number of emerge threads) int 0 0 32767
 #    Maximum time an interactive request (e.g. server list fetch) may take, stated in milliseconds.
 curl_timeout (cURL interactive timeout) int 20000 1000 2147483647
 
+#    Set proxy to use by cURL. This is an URI just like the *_proxy environment variables.
+#    Note that this will not apply to Luanti's in-game protocol.
+secure.curl_proxy (cURL proxy address) string
+
 #    Limits number of parallel HTTP requests. Affects:
 #    -    Media fetch if server uses remote_media setting.
 #    -    Serverlist download and server announcement.
@@ -2462,7 +2476,7 @@ enable_joysticks (Enable joysticks) bool false
 joystick_id (Joystick ID) int 0 0 255
 
 #    The type of joystick
-joystick_type (Joystick type) enum auto auto,generic,xbox,dragonrise_gamecube
+joystick_type (Joystick type) enum auto auto,generic,xbox,ps5,dragonrise_gamecube
 
 #    The time in seconds it takes between repeated events
 #    when holding down a joystick button combination.

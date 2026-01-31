@@ -5,6 +5,7 @@
 #include "lua_api/l_mainmenu.h"
 #include "lua_api/l_internal.h"
 #include "common/c_content.h"
+#include "config.h"
 #include "scripting_mainmenu.h"
 #include "gui/guiEngine.h"
 #include "gui/guiMainMenu.h"
@@ -215,6 +216,32 @@ int ModApiMainMenu::l_set_clouds(lua_State *L)
 
 	engine->m_clouds_enabled = value;
 
+	return 0;
+}
+
+
+/******************************************************************************/
+int ModApiMainMenu::l_set_clouds_color(lua_State* L)
+{
+	GUIEngine* engine = getGuiEngine(L);
+	sanity_check(engine != NULL);
+
+	video::SColor color;
+	parseColorString(readParam<std::string>(L, 1), color, false);
+
+	engine->setMenuCloudsColor(color);
+	return 0;
+}
+
+int ModApiMainMenu::l_set_sky_color(lua_State* L)
+{
+	GUIEngine* engine = getGuiEngine(L);
+	sanity_check(engine != NULL);
+
+	video::SColor color;
+	parseColorString(readParam<std::string>(L, 1), color, false);
+
+	engine->setMenuSkyColor(color);
 	return 0;
 }
 
@@ -657,11 +684,10 @@ int ModApiMainMenu::l_delete_world(lua_State *L)
 int ModApiMainMenu::l_set_topleft_text(lua_State *L)
 {
 	GUIEngine* engine = getGuiEngine(L);
-	sanity_check(engine != NULL);
+	sanity_check(engine);
 
 	std::string text;
-
-	if (!lua_isnone(L,1) &&	!lua_isnil(L,1))
+	if (!lua_isnoneornil(L, 1))
 		text = luaL_checkstring(L, 1);
 
 	engine->setTopleftText(text);
@@ -964,12 +990,11 @@ int ModApiMainMenu::l_get_active_irrlicht_device(lua_State *L)
 		}
 	}();
 	if (auto version = device->getVersionString(); !version.empty())
-		device_name.append(" " + version);
+		device_name.append(" ").append(version);
 	lua_pushstring(L, device_name.c_str());
 	return 1;
 }
 
-/******************************************************************************/
 int ModApiMainMenu::l_get_min_supp_proto(lua_State *L)
 {
 	lua_pushinteger(L, CLIENT_PROTOCOL_VERSION_MIN);
@@ -982,14 +1007,25 @@ int ModApiMainMenu::l_get_max_supp_proto(lua_State *L)
 	return 1;
 }
 
-/******************************************************************************/
 int ModApiMainMenu::l_get_formspec_version(lua_State  *L)
 {
 	lua_pushinteger(L, FORMSPEC_API_VERSION);
 	return 1;
 }
 
-/******************************************************************************/
+int ModApiMainMenu::l_is_debug_build(lua_State  *L)
+{
+	bool ret = false;
+	// We can't know for sure, but as far as our own build types go the following
+	// two use -O0. Check NDEBUG too to definitely exclude release builds.
+#ifndef NDEBUG
+	if (strcmp(BUILD_TYPE, "Debug") == 0 || strcmp(BUILD_TYPE, "None") == 0)
+		ret = true;
+#endif
+	lua_pushboolean(L, ret);
+	return 1;
+}
+
 int ModApiMainMenu::l_open_url(lua_State *L)
 {
 	std::string url = luaL_checkstring(L, 1);
@@ -1068,6 +1104,8 @@ void ModApiMainMenu::Initialize(lua_State *L, int top)
 	API_FCT(update_formspec);
 	API_FCT(set_formspec_prepend);
 	API_FCT(set_clouds);
+	API_FCT(set_sky_color);
+	API_FCT(set_clouds_color);
 	API_FCT(get_textlist_index);
 	API_FCT(get_table_index);
 	API_FCT(get_worlds);
@@ -1109,6 +1147,7 @@ void ModApiMainMenu::Initialize(lua_State *L, int top)
 	API_FCT(get_min_supp_proto);
 	API_FCT(get_max_supp_proto);
 	API_FCT(get_formspec_version);
+	API_FCT(is_debug_build);
 	API_FCT(open_url);
 	API_FCT(open_url_dialog);
 	API_FCT(open_dir);
@@ -1141,8 +1180,9 @@ void ModApiMainMenu::InitializeAsync(lua_State *L, int top)
 	API_FCT(extract_zip);
 	API_FCT(may_modify_path);
 	API_FCT(download_file);
+	API_FCT(get_language);
 	API_FCT(get_min_supp_proto);
 	API_FCT(get_max_supp_proto);
 	API_FCT(get_formspec_version);
-	API_FCT(get_language);
+	API_FCT(is_debug_build);
 }

@@ -96,7 +96,6 @@ protected:
 
 	bool Alpha;
 	bool Blending;
-	bool AlphaTest;
 
 	struct SUniformInfo
 	{
@@ -105,7 +104,6 @@ protected:
 		GLint location;
 	};
 
-	GLhandleARB Program;
 	GLuint Program2;
 	core::array<SUniformInfo> UniformInfo;
 	s32 UserData;

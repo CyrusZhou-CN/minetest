@@ -6,7 +6,7 @@
 
 #include "irr_v3d.h"
 #include "map.h"
-#include "hud.h" // HudElementStat
+#include "hud_element.h" // HudElementStat
 #include "gamedef.h"
 #include "content/subgames.h"
 #include "network/peerhandler.h"
@@ -16,7 +16,7 @@
 #include "server/clientiface.h"
 #include "threading/ordered_mutex.h"
 #include "translation.h"
-#include "sound.h"
+#include "sound_spec.h"
 #include <atomic>
 #include <csignal>
 #include <string>
@@ -474,7 +474,7 @@ public:
 		EnvAutoLock(Server *server): m_lock(server->m_env_mutex) {}
 
 	private:
-		std::lock_guard<ordered_mutex> m_lock;
+		std::lock_guard<std::mutex> m_lock;
 	};
 
 protected:
@@ -662,7 +662,7 @@ private:
 	*/
 
 	// Environment mutex (envlock)
-	ordered_mutex m_env_mutex;
+	std::mutex m_env_mutex;
 
 	// World directory
 	std::string m_path_world;
