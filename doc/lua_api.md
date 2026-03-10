@@ -108,13 +108,21 @@ The game directory can contain the following files:
       See [Translating content meta](#translating-content-meta).
 * `minetest.conf`:
   Used to set default settings when running this game.
+* `screenshot.{png,jpg,jpeg}`:
+  Preview image, shown in the main menu.
 * `settingtypes.txt`:
   In the same format as the one in builtin.
   This settingtypes.txt will be parsed by the menu and the settings will be
   displayed in the "Games" category in the advanced settings tab.
-* If the game contains a folder called `textures` the server will load it as a
-  texturepack, overriding mod textures.
-  Any server texturepack will override mod textures and the game texturepack.
+
+And the following directories:
+
+* `menu`:
+  Files related to the main menu, see chapter [Menu images](#menu-images).
+* `mods`:
+  Mods provided by the game.
+* `textures`:
+  See also chapter [Textures](#loading-order).
 
 Menu images
 -----------
@@ -228,7 +236,7 @@ A `Settings` file that provides meta information about the mod.
 * `textdomain`: Textdomain used to translate title and description. Defaults to modname.
   See [Translating content meta](#translating-content-meta).
 
-### `screenshot.png`
+### `screenshot.{png,jpg,jpeg}`
 
 A screenshot shown in the mod manager within the main menu. It should
 have an aspect ratio of 3:2 and a minimum size of 300×200 pixels.
@@ -515,6 +523,8 @@ By default the world is filled with air nodes. To set a different node use e.g.:
 Textures
 ========
 
+## Introduction
+
 Mods should generally prefix their textures with `modname_`, e.g. given
 the mod name `foomod`, a texture could be called:
 
@@ -536,6 +546,23 @@ or will be upscaled to that minimum resolution first without filtering.
 
 This is subject to change to move more control to the Lua API, but you can rely on
 low-res textures not suddenly becoming filtered.
+
+
+## Loading order
+
+Texture names are looked up in the following order. Top has the lowest priority.
+
+* Client: `$path_share/textures/base/pack`
+* Server: mod-provided textures, in their `textures` directory
+* Server: game textures, in `<game path>/textures`
+* Server: `$path_share/textures/server`
+* Server: `override.txt` in the path specified by the setting `texture_path`
+* Server: `override.txt` in `<game path>/textures`
+* Client: path specified by the setting `texture_path`
+* Client: `override.txt` in the path specified by the setting `texture_path`
+
+For details on texture packs, see [texture_packs.md](texture_packs.md).
+
 
 Texture modifiers
 -----------------
@@ -599,11 +626,11 @@ on top of `cobble.png`.
 
 Parameters:
 
-* `<t>`: tile count (in each direction)
-* `<n>`: animation frame count
-* `<p>`: current animation frame
+* `<t>`: draws a grid of `<t> * <t>` cracks onto each frame (default: `1`)
+* `<n>`: vertical count of frames of the base texture (often `1`)
+* `<p>`: crack animation frame (0-indexed)
 
-Draw a step of the crack animation on the texture.
+Draws a step of the crack animation on the texture.
 `crack` draws it normally, while `cracko` lays it over, keeping transparent
 pixels intact.
 
@@ -3091,7 +3118,7 @@ Elements
 
 ### `background9[<X>,<Y>;<W>,<H>;<texture name>;<auto_clip>;<middle>]`
 
-* 9-sliced background. See https://en.wikipedia.org/wiki/9-slice_scaling
+* 9-sliced background. See [Wikipedia](https://en.wikipedia.org/wiki/9-slice_scaling)
 * Middle is a rect which defines the middle of the 9-slice.
     * `x` - The middle will be x pixels from all sides.
     * `x,y` - The middle will be x pixels from the horizontal and y from the vertical.
@@ -3908,7 +3935,8 @@ Escape sequences
 ================
 
 Most text can contain escape sequences, that can for example color the text.
-There are a few exceptions: tab headers, dropdowns and vertical labels can't.
+There are a few exceptions: tab headers and dropdowns can't be colorized
+(but they *can* be translated).
 The following functions provide escape sequences:
 
 * `core.get_color_escape_sequence(color)`:
@@ -3966,8 +3994,7 @@ Spatial Vectors
 
 Luanti stores 3-dimensional spatial vectors in Lua as tables of 3 coordinates,
 and has a class to represent them (`vector.*`), which this chapter is about.
-For details on what a spatial vectors is, please refer to Wikipedia:
-https://en.wikipedia.org/wiki/Euclidean_vector.
+For details on what a spatial vector is, please refer to [Wikipedia](https://en.wikipedia.org/wiki/Euclidean_vector).
 
 Spatial vectors are used for various things, including, but not limited to:
 
@@ -4226,7 +4253,7 @@ Helper functions
     * `string.pack(fmt, ...)`
     * `string.unpack(fmt, s, [pos])`
     * `string.packsize(fmt)`
-    * Backported from Lua 5.4, see https://www.lua.org/manual/5.4/manual.html#6.4.2
+    * Backported from Lua 5.4, see [Lua manual section 6.4.2](https://www.lua.org/manual/5.4/manual.html#6.4.2)
 * `core.wrap_text(str, limit, as_table)`: returns a string or table
     * Adds newlines to the string to keep it within the specified character
       limit
@@ -4368,7 +4395,7 @@ Two functions are provided to translate strings: `core.translate` and
   the client, the choice between singular and plural might be more complicated,
   but the choice will be done automatically using the value of `n`.
 
-  You can read https://www.gnu.org/software/gettext/manual/html_node/Plural-forms.html
+  You can read [the Gettext documentation](https://www.gnu.org/software/gettext/manual/html_node/Plural-forms.html)
   for more details on the differences of plurals between languages.
 
   Also note that plurals are only handled in .po or .mo files, and not in .tr files.
@@ -5782,7 +5809,7 @@ Utilities
       dynamic_add_media_table = true,
       -- particlespawners support texpools and animation of properties,
       -- particle textures support smooth fade and scale animations, and
-      -- sprite-sheet particle animations can by synced to the lifetime
+      -- sprite-sheet particle animations can be synced to the lifetime
       -- of individual particles (5.6.0)
       particlespawner_tweenable = true,
       -- allows get_sky to return a table instead of separate values (5.6.0)
@@ -5908,19 +5935,19 @@ Utilities
   ```
 
 * `core.protocol_versions`:
-  * Table mapping Luanti versions to corresponding protocol versions for modder convenience.
-  * For example, to check whether a client has at least the feature set
-    of Luanti 5.8.0 or newer, you could do:
-    `core.get_player_information(player_name).protocol_version >= core.protocol_versions["5.8.0"]`
-  * (available since 5.11)
+    * Table mapping Luanti versions to corresponding protocol versions for modder convenience.
+    * For example, to check whether a client has at least the feature set
+      of Luanti 5.8.0 or newer, you could do:
+      `core.get_player_information(player_name).protocol_version >= core.protocol_versions["5.8.0"]`
+    * (available since 5.11)
 
-  ```lua
-  {
-      [version string] = protocol version at time of release
-      -- every major and minor version has an entry
-      -- patch versions only for the first release whose protocol version is not already present in the table
-  }
-  ```
+    ```lua
+    {
+        [version string] = protocol version at time of release
+        -- every major and minor version has an entry
+        -- patch versions only for the first release whose protocol version is not already present in the table
+    }
+    ```
 
 * `core.get_player_window_information(player_name)`:
 
@@ -5966,6 +5993,7 @@ Utilities
       touch_controls = false,
   }
   ```
+
 * `core.path_exists(path)`: returns true if the given path exists else false
     * `path` is the path that will be tested can be either a directory or a file
 * `core.mkdir(path)`: returns success.
@@ -8966,6 +8994,11 @@ child will follow movement and rotation of that bone.
             * `fog_color`: ColorSpec, override the color of the fog.
                Unlike `base_color` above this will apply regardless of the skybox type.
                (default: `"#00000000"`, which means no override)
+        * `auto_dim_skybox`: boolean, whether to dim skybox brightness if
+          the sky is assumed not to be visible (e.g. in caves),
+          based on a hardcoded and sometimes buggy heuristic.
+          Requires a Luanti 5.16.0+ client and server.
+          (default: `true`)
 * `set_sky(base_color, type, {texture names}, clouds)`
     * Deprecated. Use `set_sky(sky_parameters)`
     * `base_color`: ColorSpec, defaults to white
