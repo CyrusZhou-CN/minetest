@@ -1399,7 +1399,7 @@ void Game::processUserInput(f32 dtime)
 	}
 
 	if (!guienv->hasFocus(gui_chat_console.get()) && gui_chat_console->isOpen()
-		&& !gui_chat_console->isMyChild(guienv->getFocus()))
+		&& !gui_chat_console->isMyDescendant(guienv->getFocus()))
 	{
 		gui_chat_console->closeConsoleAtOnce();
 	}
@@ -2304,6 +2304,7 @@ void Game::handleClientEvent_HudAdd(ClientEvent *event, CameraOrientation *cam)
 	e->z_index   = event->hudadd->z_index;
 	e->text2     = event->hudadd->text2;
 	e->style     = event->hudadd->style;
+	e->hideable  = event->hudadd->hideable;
 	m_hud_server_to_client[server_id] = player->addHud(e);
 
 	delete event->hudadd;
@@ -2371,6 +2372,8 @@ void Game::handleClientEvent_HudChange(ClientEvent *event, CameraOrientation *ca
 		CASE_SET(HUD_STAT_TEXT2, text2, sdata);
 
 		CASE_SET(HUD_STAT_STYLE, style, data);
+
+		CASE_SET(HUD_STAT_HIDEABLE, hideable, data);
 
 		case HudElementStat_END:
 			break;
@@ -3511,7 +3514,9 @@ void Game::updateFrame(ProfilerGraph *graph, RunStats *stats, f32 dtime,
 		// Update wielded tool
 		ItemStack selected_item, hand_item;
 		ItemStack &tool_item = player->getWieldedItem(&selected_item, &hand_item);
-		camera->wield(tool_item);
+
+		bool skip_anim = client->consumeSkipNextWieldAnimation();
+		camera->wield(tool_item, !skip_anim);
 	}
 
 	/*

@@ -1883,6 +1883,9 @@ There is **no** guarantee that an active mapblock has already been filled by the
 Related API functions:
 
 * `core.compare_block_status`
+* `core.get_loaded_blocks`
+* `core.get_loadable_blocks`
+* `core.get_active_blocks`
 * `core.forceload_block`
 * `core.load_area`
 * `core.emerge_area`
@@ -1974,6 +1977,10 @@ Default 0. By convention, the following values are recommended:
 If your HUD element doesn't fit into any category, pick an integer
 between the suggested values.
 
+If the `hideable` field is set to `false`, players can not hide the element.
+It can be used to for example obstruct the view of players.
+Does not take effect for clients older than version 5.17
+
 Below are the specific uses for fields in each type; fields not listed for that
 type are ignored.
 
@@ -1995,9 +2002,6 @@ Displays an image on the HUD.
 
 Displays text on the HUD.
 
-* `scale`: Defines the bounding rectangle of the text, syntax is
-  `{ x = <number>, y = <number> }`.
-  A value such as `{ x = 100, y = 100 }` should work.
 * `text`: The text to be displayed in the HUD element.
   Supports `core.translate` (always)
   and `core.colorize` (since protocol version 44)
@@ -2014,6 +2018,9 @@ Displays text on the HUD.
       a rounded down integer value.
 * `style`: determines font style
   Bitfield with 1 = bold, 2 = italic, 4 = monospace
+* `scale`: Do not use.
+  Note: Previous versions of the documentation claimed this field sets
+  a "bounding rectangle" for the text, but it never worked.
 
 ### `statbar`
 
@@ -6143,6 +6150,8 @@ Utilities
       get_modnames_load_order = true,
       -- `ObjectRef:set_camera()` accepts `nil` to indicate reset (5.16.0)
       set_camera_resettable = true,
+      -- The HUD element field `hideable` exists (5.17.0)
+      hud_hideable_field = true,
   }
   ```
 
@@ -8153,6 +8162,22 @@ Misc.
     * If `transient` is `false` or absent, frees a persistent forceload.
       If `true`, frees a transient forceload.
 
+* `core.get_loaded_blocks()`
+    * Returns a list of all mapblock positions currently loaded in memory.
+    * The returned list is a snapshot. Blocks can become (un)loaded at any point.
+
+* `core.get_loadable_blocks()`
+    * Returns a list of all mapblock positions that currently exist in the map
+      database and can be loaded.
+    * The returned list is a snapshot. Blocks can (dis)appear at any point.
+    * This is an expensive operation, since it may have to scan the entire database.
+      Use sparingly.
+    * Note that there can be blocks that are loaded, but not loadable (if they weren't saved yet).
+
+* `core.get_active_blocks()`
+    * Returns a list of all mapblock positions currently active.
+    * The returned list is a snapshot. Blocks can become (in)active at any point.
+
 * `core.compare_block_status(pos, condition)`
     * Checks whether the mapblock at position `pos` is in the wanted condition.
     * `condition` may be one of the following values:
@@ -8810,8 +8835,9 @@ child will follow movement and rotation of that bone.
    is in.
 * `get_wield_index()`: returns the wield list index of the wielded item (starting with 1)
 * `get_wielded_item()`: returns a copy of the wielded item as an `ItemStack`
-* `set_wielded_item(item)`: replaces the wielded item, returns `true` if
+* `set_wielded_item(item, skip_anim)`: replaces the wielded item, returns `true` if
   successful.
+  * if `skip_anim` is `true`, the change animation is skipped. Default is `false`
 * `get_armor_groups()`:
     * returns a table with all of the object's armor group ratings
     * syntax: the table keys are the armor group names,
@@ -9976,6 +10002,16 @@ Player properties need to be saved manually.
     show_on_minimap = false,
     -- Defaults to true for players, false for other entities.
     -- If set to true the entity will show as a marker on the minimap.
+
+    step_up_mode = "legacy",
+    -- Defaults to "legacy" for players and entities.
+    -- This field controls the jump and step-up behavior. Options:
+    -- "legacy": Objects always jolt up on the edge of a node, which increases climbing speed.
+    -- "floaty": Balance between "legacy" and "rigid". Step-up is only possible when
+    --   standing on ground or falling. In practice, this allows walking over 1 node gaps.
+    -- "rigid": Step-up is only possible when standing on ground.
+    --   In practice, you cannot parkour clutch edges of nodes.
+    -- Supported by clients >= 5.16.0.
 }
 ```
 
@@ -11884,6 +11920,8 @@ Used by `ObjectRef:hud_add`. Returned by `ObjectRef:hud_get`.
     -- Z index: lower z-index HUDs are displayed behind higher z-index HUDs
 
     style = 0, -- integer [u32]
+
+    hideable = true, -- bool
 }
 ```
 

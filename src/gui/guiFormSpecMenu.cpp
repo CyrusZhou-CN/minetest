@@ -167,6 +167,12 @@ void GUIFormSpecMenu::removeTooltip()
 
 void GUIFormSpecMenu::setInitialFocus()
 {
+	if (m_held_mouse_button != BET_OTHER) {
+		// Ongoing inventory list interaction (they have no `FieldSpec::fname` to focus).
+		Environment->setFocus(this);
+		return;
+	}
+
 	// Set initial focus according to following order of precedence:
 	// 1. first empty editbox
 	// 2. first editbox
@@ -404,7 +410,7 @@ void GUIFormSpecMenu::parseScrollContainer(parserData *data, const std::string &
 
 	clipper->drop();
 
-	// remove interferring offset of normal containers
+	// remove interfering offset of normal containers
 	container_stack.push(pos_offset);
 	pos_offset.X = 0.0f;
 	pos_offset.Y = 0.0f;
@@ -1826,7 +1832,7 @@ void GUIFormSpecMenu::parseLabel(parserData* data, const std::string &element)
 
 			if (data->real_coordinates) {
 				// Lines are spaced at the distance of 1/2 imgsize.
-				// This alows lines that line up with the new elements
+				// This allows lines that line up with the new elements
 				// easily without sacrificing good line distance.  If
 				// it was one whole imgsize, it would have too much
 				// spacing.
@@ -2995,7 +3001,7 @@ void GUIFormSpecMenu::regenerateGui(v2u32 screensize)
 		// Preserve focus
 		gui::IGUIElement *focused_element = Environment->getFocus();
 		// Check recursively to cover elements inside e.g. scroll containers
-		if (focused_element && isMyChild(focused_element)) {
+		if (focused_element && isMyDescendant(focused_element)) {
 			s32 focused_id = focused_element->getID();
 			if (focused_id > ID_PROCEED_BTN) {
 				for (const GUIFormSpecMenu::FieldSpec &field : m_fields) {
@@ -3008,6 +3014,13 @@ void GUIFormSpecMenu::regenerateGui(v2u32 screensize)
 		}
 	} else {
 		// Don't keep old focus value
+		m_focused_element = std::nullopt;
+		// Discard active inventory list interaction
+		m_held_mouse_button = BET_OTHER;
+	}
+
+	if (m_held_mouse_button != BET_OTHER) {
+		// Inventory list interaction -> focus "this". See also: `setInitialFocus`
 		m_focused_element = std::nullopt;
 	}
 
@@ -3315,7 +3328,7 @@ void GUIFormSpecMenu::regenerateGui(v2u32 screensize)
 	// Set initial focus if parser didn't set it
 	gui::IGUIElement *focused_element = Environment->getFocus();
 	if (!focused_element
-			|| !isMyChild(focused_element)
+			|| !isMyDescendant(focused_element)
 			|| focused_element->getType() == gui::EGUIET_TAB_CONTROL)
 		setInitialFocus();
 
@@ -3731,7 +3744,7 @@ void GUIFormSpecMenu::autoScroll()
 
 	// Find the scroll container that contains the focused element
 	for (const auto &cont : m_scroll_containers) {
-		if (!cont.second->isMyChild(focus))
+		if (!cont.second->isMyDescendant(focus))
 			continue;
 
 		gui::IGUIElement *clipper = cont.second->getParent();
@@ -4115,7 +4128,7 @@ bool GUIFormSpecMenu::preprocessEvent(const SEvent& event)
 		gui::IGUIElement *hovered =
 			Environment->getRootGUIElement()->getElementFromPoint(
 				core::position2d<s32>(x, y));
-		if (hovered && isMyChild(hovered) &&
+		if (hovered && isMyDescendant(hovered) &&
 				hovered->getType() == gui::EGUIET_TAB_CONTROL) {
 			gui::IGUISkin* skin = Environment->getSkin();
 			sanity_check(skin != NULL);
@@ -4136,7 +4149,7 @@ bool GUIFormSpecMenu::preprocessEvent(const SEvent& event)
 				|| keySettingHasMatch("keymap_inventory", kp)
 				|| event.KeyInput.Key==KEY_RETURN) {
 			gui::IGUIElement *focused = Environment->getFocus();
-			if (focused && isMyChild(focused) &&
+			if (focused && isMyDescendant(focused) &&
 					(focused->getType() == gui::EGUIET_LIST_BOX ||
 					focused->getType() == gui::EGUIET_CHECK_BOX) &&
 					(focused->getParent()->getType() != gui::EGUIET_COMBO_BOX ||
@@ -4156,7 +4169,7 @@ bool GUIFormSpecMenu::preprocessEvent(const SEvent& event)
 		gui::IGUIElement *hovered =
 			Environment->getRootGUIElement()->getElementFromPoint(
 				core::position2d<s32>(x, y));
-		if (hovered && isMyChild(hovered)) {
+		if (hovered && isMyDescendant(hovered)) {
 			hovered->OnEvent(event);
 			return event.MouseInput.Event == EMIE_MOUSE_WHEEL;
 		}

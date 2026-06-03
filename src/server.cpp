@@ -1584,7 +1584,7 @@ void Server::SendNodeDef(session_t peer_id,
 	Non-static send methods
 */
 
-void Server::SendInventory(RemotePlayer *player, bool incremental)
+void Server::SendInventory(RemotePlayer *player, bool incremental, bool skip_wield_anim)
 {
 	// Do not send new format to old clients
 	incremental &= player->protocol_version >= 38;
@@ -1601,8 +1601,15 @@ void Server::SendInventory(RemotePlayer *player, bool incremental)
 	player->inventory.serialize(os, incremental);
 	player->inventory.setModified(false);
 	player->setModified(true);
+	std::string content = os.str();
 
-	pkt.putRawString(os.str());
+	if (player->protocol_version >= 52) {
+		pkt.putLongString(content);
+		pkt << skip_wield_anim;
+	} else {
+		pkt.putRawString(content);
+	}
+
 	Send(&pkt);
 }
 
@@ -1877,7 +1884,11 @@ void Server::SendHUDAdd(session_t peer_id, u32 id, HudElement *form)
 	else
 		pkt << v2s32::from(form->size);
 
-	pkt << form->z_index << form->text2 << form->style;
+	/// Bit 0: hideable
+	/// Bits 1 ... 8: unused (set to 0)
+	u8 flags = form->hideable ? 1 : 0;
+
+	pkt << form->z_index << form->text2 << form->style << flags;
 
 	Send(&pkt);
 }
@@ -1917,6 +1928,9 @@ void Server::SendHUDChange(session_t peer_id, u32 id, HudElementStat stat, void 
 				pkt << v2s32::from(*v);
 			break;
 		}
+		case HUD_STAT_HIDEABLE:
+			pkt << u32{*(bool *) value};
+			break;
 		default: // all other types
 			pkt << *(u32 *) value;
 			break;
@@ -2748,10 +2762,11 @@ void Server::sendMediaAnnouncement(session_t peer_id, const std::string &lang_co
 	auto include = [&] (const std::string &name, const MediaInfo &info) -> bool {
 		if (info.no_announce)
 			return false;
-		// Only send translations matching the client's language
-		auto this_lang_code = Translations::getFileLanguage(name);
-		if (!this_lang_code.empty() && this_lang_code != lang_code)
-			return false;
+		if (Translations::isTranslationFileType(name)) {
+			// Only send translations matching the client's language
+			auto this_lang_code = Translations::getFileLanguage(name);
+			return !this_lang_code.empty() && this_lang_code == lang_code;
+		}
 		return true;
 	};
 
