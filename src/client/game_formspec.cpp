@@ -244,7 +244,7 @@ void GameFormSpec::showFormSpec(const std::string &formspec, const std::string &
 
 	// Replace the currently open formspec
 	GUIFormSpecMenu::create(m_formspec, m_client, m_rendering_engine->get_gui_env(),
-		&m_input->joystick, fs_src, txt_dst, m_client->getFormspecPrepend(),
+		fs_src, txt_dst, m_client->getFormspecPrepend(),
 		m_client->getSoundManager());
 	m_formspec->setName(formname);
 }
@@ -259,7 +259,7 @@ void GameFormSpec::showCSMFormSpec(const std::string &formspec, const std::strin
 		new LocalScriptingFormspecHandler(formname, m_client->getScript());
 
 	GUIFormSpecMenu::create(m_formspec, m_client, m_rendering_engine->get_gui_env(),
-			&m_input->joystick, fs_src, txt_dst, m_client->getFormspecPrepend(),
+			fs_src, txt_dst, m_client->getFormspecPrepend(),
 			m_client->getSoundManager());
 	m_formspec->setName(formname);
 }
@@ -283,7 +283,7 @@ void GameFormSpec::showPauseMenuFormSpec(const std::string &formspec, const std:
 	GUIFormSpecMenu *fs = nullptr;
 	GUIFormSpecMenu::create(fs, m_client, m_rendering_engine->get_gui_env(),
 			// Ignore formspec prepend.
-			&m_input->joystick, fs_src, txt_dst, "",
+			fs_src, txt_dst, "",
 			m_client->getSoundManager());
 
 	fs->setName(formname);
@@ -303,7 +303,7 @@ void GameFormSpec::showNodeFormspec(const std::string &formspec, const v3s16 &no
 	TextDest *txt_dst = new TextDestNodeMetadata(nodepos, m_client);
 
 	GUIFormSpecMenu::create(m_formspec, m_client, m_rendering_engine->get_gui_env(),
-		&m_input->joystick, fs_src, txt_dst, m_client->getFormspecPrepend(),
+		fs_src, txt_dst, m_client->getFormspecPrepend(),
 		m_client->getSoundManager());
 
 	m_formspec->setFormSpec(formspec, inventoryloc);
@@ -346,14 +346,14 @@ void GameFormSpec::showPlayerInventory(const std::string *fs_override)
 	TextDest *txt_dst = new TextDestPlayerInventory(m_client);
 
 	GUIFormSpecMenu::create(m_formspec, m_client, m_rendering_engine->get_gui_env(),
-		&m_input->joystick, fs_src.get(), txt_dst, m_client->getFormspecPrepend(),
+		fs_src.get(), txt_dst, m_client->getFormspecPrepend(),
 		m_client->getSoundManager());
 
 	m_formspec->setFormSpec(fs_src->getForm(), inventoryloc);
 	fs_src.release(); // owned by GUIFormSpecMenu
 }
 
-#define SIZE_TAG "size[11,5.5,true]" // Fixed size (ignored in touchscreen mode)
+#define SIZE_TAG "size[14.25,7.275,true]" // Fixed size (ignored in touchscreen mode)
 
 void GameFormSpec::showPauseMenu()
 {
@@ -377,46 +377,56 @@ void GameFormSpec::showPauseMenu()
 
 	auto simple_singleplayer_mode = m_client->m_simple_singleplayer_mode;
 
-	float ypos = simple_singleplayer_mode ? 0.7f : 0.1f;
+	const float button_height = 0.8f;
+	const float spacing = 0.38f;
+	float ypos = simple_singleplayer_mode ? 1.05f : 0.325f;
 	std::ostringstream os;
 
-	os << "formspec_version[1]" << SIZE_TAG
-		<< "button_exit[4," << (ypos++) << ";3,0.5;btn_continue;"
+	os << "formspec_version[2]" << SIZE_TAG;
+
+	if (simple_singleplayer_mode) {
+		os << "style_type[label;halign=center;valign=center]";
+		os << "label[5.375,0;3.5," << ypos << ";" << strgettext("Game paused") << "]";
+	}
+
+	os << "container[5.375,0]";
+	os << "button_exit[0," << ypos << ";3.5," << button_height << ";btn_continue;"
 		// TRANSLATORS: Pause menu button, try to keep the translation short
 		<< strgettext("Continue") << "]";
 
 	if (!simple_singleplayer_mode) {
-		os << "button[4," << (ypos++) << ";3,0.5;btn_change_password;"
+		os << "button[0," << (ypos += button_height + spacing) << ";3.5," << button_height << ";btn_change_password;"
 			// TRANSLATORS: Pause menu button, try to keep the translation short
 			<< strgettext("Change Password") << "]";
-	} else {
-		os << "field[4.95,0;5,1.5;;" << strgettext("Game paused") << ";]";
 	}
 
-	os	<< "button[4," << (ypos++) << ";3,0.5;btn_settings;"
+	os << "button[0," << (ypos += button_height + spacing) << ";3.5," << button_height << ";btn_settings;"
 		// TRANSLATORS: Try to keep the translation short
 		<< strgettext("Settings") << "]";
 
 #ifndef __ANDROID__
 #if USE_SOUND
-	os << "button[4," << (ypos++) << ";3,0.5;btn_sound;"
+	os << "button[0," << (ypos += button_height + spacing) << ";3.5," << button_height << ";btn_sound;"
 		// TRANSLATORS: Pause menu button, try to keep the translation short
 		<< strgettext("Sound Volume") << "]";
 #endif
 #endif
 
-	os		<< "button_exit[4," << (ypos++) << ";3,0.5;btn_exit_menu;"
+	os << "button_exit[0," << (ypos += button_height + spacing) << ";3.5," << button_height << ";btn_exit_menu;"
 		// TRANSLATORS: Pause menu button, try to keep the translation short
 		<< strgettext("Exit to Menu") << "]";
-	os		<< "button_exit[4," << (ypos++) << ";3,0.5;btn_exit_os;"
+
+	os << "button_exit[0," << (ypos += button_height + spacing) << ";3.5," << button_height << ";btn_exit_os;"
 		// TRANSLATORS: Pause menu button, try to keep the translation short (OS = Operating System)
-		<< strgettext("Exit to OS")   << "]";
+		<< strgettext("Exit to OS") << "]";
+
+	os << "container_end[]";
 	if (!control_text.empty()) {
-	os		<< "textarea[7.5,0.25;3.9,6.25;;" << control_text << ";]";
+		os << "textarea[9.25,0.8;4.625,6.1;;" << control_text << ";]";
 	}
-	os		<< "textarea[0.4,0.25;3.9,6.25;;" << PROJECT_NAME_C " " VERSION_STRING "\n"
-		<< "\n"
-		<<  strgettext("Game info:") << "\n";
+	os << "textarea[0.375,0.8;4.625,6.075;;" << PROJECT_NAME_C " " VERSION_STRING "\n"
+		<< "\n" <<  strgettext("Game info:") << "\n";
+
 	const std::string &address = m_client->getAddressName();
 	// TRANSLATORS: Game mode (server or singleplayer)
 	os << strgettext("- Mode: ");
@@ -460,7 +470,7 @@ void GameFormSpec::showPauseMenu()
 	HardcodedPauseFormspecHandler *txt_dst = new HardcodedPauseFormspecHandler();
 
 	GUIFormSpecMenu::create(m_formspec, m_client, m_rendering_engine->get_gui_env(),
-			&m_input->joystick, fs_src, txt_dst, m_client->getFormspecPrepend(),
+			fs_src, txt_dst, m_client->getFormspecPrepend(),
 			m_client->getSoundManager());
 	m_formspec->setFocus("btn_continue");
 	// game will be paused in next step, if in singleplayer (see Game::m_is_paused)
@@ -470,11 +480,12 @@ void GameFormSpec::showPauseMenu()
 void GameFormSpec::showDeathFormspecLegacy()
 {
 	static std::string formspec_str =
-		std::string("formspec_version[1]") +
+		std::string("formspec_version[2]") +
 		SIZE_TAG
 		"bgcolor[#320000b4;true]"
-		"label[4.85,1.35;" + gettext("You died") + "]"
-		"button_exit[4,3;3,0.5;btn_respawn;" + gettext("Respawn") + "]"
+		"style_type[label;halign=center;valign=center]"
+		"label[5.375,1.85;3.5,0.8;" + gettext("You died") + "]"
+		"button_exit[5.375,3.725;3.5,0.8;btn_respawn;" + gettext("Respawn") + "]"
 		;
 
 	/* Create menu */
@@ -484,7 +495,7 @@ void GameFormSpec::showDeathFormspecLegacy()
 	LegacyDeathFormspecHandler *txt_dst = new LegacyDeathFormspecHandler(m_client);
 
 	GUIFormSpecMenu::create(m_formspec, m_client, m_rendering_engine->get_gui_env(),
-		&m_input->joystick, fs_src, txt_dst, m_client->getFormspecPrepend(),
+		fs_src, txt_dst, m_client->getFormspecPrepend(),
 		m_client->getSoundManager());
 	m_formspec->setFocus("btn_respawn");
 }

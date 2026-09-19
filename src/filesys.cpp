@@ -4,7 +4,7 @@
 
 #include "filesys.h"
 #include "util/string.h"
-#include <iostream>
+#include <filesystem>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -32,7 +32,6 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <unistd.h>
 #include <fcntl.h>
 #endif
@@ -142,46 +141,13 @@ bool IsExecutable(const std::string &path)
 	return GetBinaryType(path.c_str(), &type) != 0;
 }
 
-bool RecursiveDelete(const std::string &path)
-{
-	assert(IsPathAbsolute(path));
-	if (!PathExists(path))
-		return true;
-
-	bool is_file = !IsDir(path);
-	infostream << "Recursively deleting " << (is_file ? "file" : "directory")
-		<< " \"" << path << "\"" << std::endl;
-	if (is_file) {
-		if (!DeleteFile(path.c_str())) {
-			errorstream << "RecursiveDelete: Failed to delete file \""
-					<< path << "\": " << LAST_OS_ERROR() << std::endl;
-			return false;
-		}
-		return true;
-	}
-	std::vector<DirListNode> content = GetDirListing(path);
-	for (const auto &n : content) {
-		std::string fullpath = path + DIR_DELIM + n.name;
-		if (!RecursiveDelete(fullpath)) {
-			errorstream << "RecursiveDelete: Failed to recurse to \""
-					<< fullpath << "\"" << std::endl;
-			return false;
-		}
-	}
-	if (!RemoveDirectory(path.c_str())) {
-		errorstream << "RecursiveDelete: Failed to delete directory \""
-					<< path << "\": " << LAST_OS_ERROR() << std::endl;
-		return false;
-	}
-	return true;
-}
-
 bool DeleteSingleFileOrEmptyDirectory(const std::string &path, bool log_error)
 {
 	if (!IsDir(path)) {
 		bool ok = DeleteFile(path.c_str()) != 0;
 		if (!ok && log_error)
 			errorstream << "DeleteFile failed: " << LAST_OS_ERROR() << std::endl;
+		return ok;
 	}
 	bool ok = RemoveDirectory(path.c_str()) != 0;
 	if (!ok && log_error)
@@ -363,49 +329,6 @@ bool IsExecutable(const std::string &path)
 	return access(path.c_str(), X_OK) == 0;
 }
 
-bool RecursiveDelete(const std::string &path)
-{
-	assert(IsPathAbsolute(path));
-	if (!PathExists(path))
-		return true;
-
-	// Execute the 'rm' command directly, by fork() and execve()
-
-	infostream << "Removing \"" << path << "\"" << std::endl;
-
-	const pid_t child_pid = fork();
-	if (child_pid == -1) {
-		errorstream << "fork errno: " << errno << ": " << strerror(errno)
-			<< std::endl;
-		return false;
-	}
-
-	if (child_pid == 0) {
-		// Child
-		std::array<const char*, 4> argv = {
-			"rm",
-			"-rf",
-			path.c_str(),
-			nullptr
-		};
-
-		execvp(argv[0], const_cast<char**>(argv.data()));
-
-		// note: use cerr because our logging won't flush in forked process
-		std::cerr << "exec errno: " << errno << ": " << strerror(errno)
-			<< std::endl;
-		_exit(1);
-	} else {
-		// Parent
-		int status;
-		pid_t tpid;
-		do
-			tpid = waitpid(child_pid, &status, 0);
-		while (tpid != child_pid);
-		return WIFEXITED(status) && WEXITSTATUS(status) == 0;
-	}
-}
-
 bool DeleteSingleFileOrEmptyDirectory(const std::string &path, bool log_error)
 {
 	if (IsDir(path)) {
@@ -552,6 +475,52 @@ bool CopyFileContents(const std::string &source, const std::string &target)
  * portable implementations *
  ****************************/
 
+bool RecursiveDelete(const std::string &path)
+{
+	assert(IsPathAbsolute(path));
+
+	std::filesystem::path p;
+	try {
+		// On Windows, this throws if `path` is not valid UTF-8.
+		p = std::filesystem::path(path);
+	} catch (const std::exception &e) {
+		errorstream << "RecursiveDelete: Invalid path \"" << path << "\": "
+				<< e.what() << std::endl;
+		return false;
+	}
+
+	std::error_code ec;
+
+	// A dangling symlink still counts as existing and will be removed below.
+	auto status = std::filesystem::symlink_status(p, ec);
+
+	// If the file does not exist, `status` will have type `not_found` and
+	// `ec` may or may not be set. So we must check the status type first.
+	//
+	// Note that we can't use std::filesystem::exists(status) here, because
+	// if a genuine error occurs (such as access denied or out-of-memory),
+	// status will have type `none`, and `exists()` returns false for that.
+	if (status.type() == std::filesystem::file_type::not_found)
+		return true;
+
+	if (ec) {
+		errorstream << "RecursiveDelete: Failed to inspect \"" << path
+				<< "\": " << ec.message() << std::endl;
+		return false;
+	}
+
+	infostream << "Recursively deleting \"" << path << "\"" << std::endl;
+
+	// Deletes symlinks instead of following them.
+	std::filesystem::remove_all(p, ec);
+	if (ec) {
+		errorstream << "RecursiveDelete: Failed to delete \"" << path
+				<< "\": " << ec.message() << std::endl;
+		return false;
+	}
+	return true;
+}
+
 void GetRecursiveDirs(std::vector<std::string> &dirs, const std::string &dir)
 {
 	constexpr std::string_view chars_to_ignore = "_.";
@@ -655,65 +624,107 @@ bool MoveDir(const std::string &source, const std::string &target)
 	return retval;
 }
 
-bool PathStartsWith(const std::string &path, const std::string &prefix)
+/// @brief try to match two paths together and see up to which point they match
+/// @return position of first mismatch (each)
+static std::pair<size_t, size_t> match_paths(std::string_view path, std::string_view prefix)
 {
-	if (prefix.empty())
-		return path.empty();
-	size_t pathsize = path.size();
-	size_t pathpos = 0;
-	size_t prefixsize = prefix.size();
-	size_t prefixpos = 0;
-	for(;;){
-		// Test if current characters at path and prefix are delimiter OR EOS
-		bool delim1 = pathpos == pathsize
-			|| IsDirDelimiter(path[pathpos]);
-		bool delim2 = prefixpos == prefixsize
-			|| IsDirDelimiter(prefix[prefixpos]);
+	const size_t pathsize = path.size(), prefixsize = prefix.size();
+	size_t pathpos = 0, prefixpos = 0;
+	for (;;) {
+		// Test if current characters at path and prefix are delimiter or EOS
+		bool delim1 = pathpos == pathsize || IsDirDelimiter(path[pathpos]);
+		bool delim2 = prefixpos == prefixsize || IsDirDelimiter(prefix[prefixpos]);
 
-		// Return false if it's delimiter/EOS in one path but not in the other
-		if(delim1 != delim2)
-			return false;
+		// Return if it's delimiter/EOS in one path but not in the other
+		if (delim1 != delim2)
+			return {pathpos, prefixpos};
 
-		if(delim1){
+		if (delim1) {
 			// Skip consequent delimiters in path, in prefix
-			while(pathpos < pathsize &&
-					IsDirDelimiter(path[pathpos]))
+			while (pathpos < pathsize && IsDirDelimiter(path[pathpos]))
 				++pathpos;
-			while(prefixpos < prefixsize &&
-					IsDirDelimiter(prefix[prefixpos]))
+			while (prefixpos < prefixsize && IsDirDelimiter(prefix[prefixpos]))
 				++prefixpos;
-			// Return true if prefix has ended (at delimiter/EOS)
-			if(prefixpos == prefixsize)
-				return true;
-			// Return false if path has ended (at delimiter/EOS)
-			// while prefix did not.
-			if(pathpos == pathsize)
-				return false;
-		}
-		else{
+			// Return if prefix or path has ended (at delimiter/EOS)
+			if (prefixpos == prefixsize || pathpos == pathsize) {
+				return {
+					pathpos   + (pathpos   == pathsize   ? 1 : 0),
+					prefixpos + (prefixpos == prefixsize ? 1 : 0)
+				};
+			}
+		} else {
 			// Skip pairwise-equal characters in path and prefix until
 			// delimiter/EOS in path or prefix.
-			// Return false if differing characters are met.
+			// Return if differing characters are met.
 			size_t len = 0;
-			do{
+			do {
 				char pathchar = path[pathpos+len];
 				char prefixchar = prefix[prefixpos+len];
-				if(FILESYS_CASE_INSENSITIVE){
+				if constexpr (FILESYS_CASE_INSENSITIVE) {
 					pathchar = my_tolower(pathchar);
 					prefixchar = my_tolower(prefixchar);
 				}
-				if(pathchar != prefixchar)
-					return false;
+				if (pathchar != prefixchar)
+					return {pathpos+len, prefixpos+len};
 				++len;
-			} while(pathpos+len < pathsize
+			} while (pathpos+len < pathsize
 					&& !IsDirDelimiter(path[pathpos+len])
 					&& prefixpos+len < prefixsize
-					&& !IsDirDelimiter(
-						prefix[prefixpos+len]));
+					&& !IsDirDelimiter(prefix[prefixpos+len]));
 			pathpos += len;
 			prefixpos += len;
+			// Note: if we have reached EOS here we will exit on the next iteration
 		}
 	}
+}
+
+bool PathsEqual(const std::string &p1, const std::string &p2)
+{
+	// trivial cases
+	if (p1 == p2)
+		return true;
+	if (p1.empty() != p2.empty())
+		return false;
+
+	auto ret = match_paths(p1, p2);
+
+	// Return true ONLY if we matched both paths to their end, meaning they are equal
+	return ret.first == p1.size() + 1 && ret.second == p2.size() + 1;
+}
+
+bool PathStartsWith(const std::string &path, const std::string &prefix)
+{
+	// trivial cases
+	if (path == prefix)
+		return true;
+	if (prefix.empty())
+		return path.empty();
+
+	auto ret = match_paths(path, prefix);
+
+	// Return true ONLY IF we matched the prefix to its end
+	return ret.second == prefix.size() + 1;
+}
+
+std::string MakePathRelativeTo(const std::string &child, const std::string &parent)
+{
+	std::string child_abs = fs::AbsolutePathPartial(child);
+	std::string parent_abs = fs::AbsolutePathPartial(parent);
+	if (child.empty() || parent.empty())
+		return ""; // error
+
+	if (!fs::PathStartsWith(child_abs, parent_abs))
+		return ""; // not child
+
+	// Note: this only works because AbsolutePathPartial gets rid of duplicate
+	// dir delimiters, so that both paths are in the canonical shortest representation.
+	if (child_abs.size() == parent_abs.size()) {
+		assert(fs::PathsEqual(child_abs, parent_abs));
+		return ".";
+	}
+	assert(child_abs.size() >= parent_abs.size() + 1);
+	assert(fs::IsDirDelimiter(child_abs[parent_abs.size()]));
+	return std::move(child_abs).substr(parent_abs.size() + 1);
 }
 
 std::string RemoveLastPathComponent(const std::string &path,
@@ -821,8 +832,14 @@ std::string AbsolutePath(const std::string &path)
 #endif
 	if (!abs_path)
 		return "";
-	std::string abs_path_str(abs_path);
+	std::filesystem::path absolute_path(abs_path, std::filesystem::path::format::native_format);
 	free(abs_path);
+
+	// remove any trailing delim before return
+	std::string abs_path_str = absolute_path.string();
+	std::string root_string = absolute_path.root_path().string();
+	while (abs_path_str.length() > root_string.length() && IsDirDelimiter(abs_path_str.back()))
+		abs_path_str.pop_back();
 	return abs_path_str;
 }
 

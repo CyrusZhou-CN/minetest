@@ -181,6 +181,13 @@ void ItemStack::deSerialize(std::istream &is, IItemDefManager *itemdef)
 		{
 			// The real thing
 
+			if (name.empty() && !is.eof()) {
+				warningstream << "Empty name with trailing characters passed to ItemStack."
+					<< " In a future engine version, this will result in an error." << std::endl;
+				// TODO: enable this in 5.19.0
+				//throw SerializationError("Empty stack name");
+			}
+
 			// Apply item aliases
 			if (itemdef)
 				name = itemdef->getAlias(name);
@@ -193,7 +200,28 @@ void ItemStack::deSerialize(std::istream &is, IItemDefManager *itemdef)
 				break;
 			}
 
-			count = stoi(count_str);
+			// Read size (count)
+			{
+				char *endp = nullptr;
+				long val = strtol(count_str.c_str(), &endp, 10);
+
+				if (endp && *endp == '\0') {
+					count = val;
+					if ((long)count != val) {
+						warningstream << "Out-of bounds stack count '" << count_str << "' (name='"
+							<< name << "')." << std::endl;
+					}
+				} else {
+					// Read failed. Do not clear the stack.
+					count = 1;
+
+					warningstream << "Failed to parse stack size '" << count_str << "' (name='"
+						<< name << "'). In a future engine version, this will result in an error."
+						<< std::endl;
+					// TODO: enable this in 5.19.0
+					//throw SerializationError("Invalid stack size");
+				}
+			}
 
 			// Read the wear
 			std::string wear_str;
@@ -585,7 +613,7 @@ void InventoryList::deSerialize(std::istream &is)
 		}
 		else if(name == "Item")
 		{
-			if(item_i > getSize() - 1)
+			if (item_i >= getSize())
 				throw SerializationError("too many items");
 			ItemStack item;
 			item.deSerialize(iss, m_itemdef);
@@ -593,7 +621,7 @@ void InventoryList::deSerialize(std::istream &is)
 		}
 		else if(name == "Empty")
 		{
-			if(item_i > getSize() - 1)
+			if (item_i >= getSize())
 				throw SerializationError("too many items");
 			m_items[item_i++].clear();
 		} else if (name == "Keep") {

@@ -89,16 +89,11 @@ public:
 		const std::string &program, bool prefer_local)
 	{
 		std::string combined = name_of_shader + DIR_DELIM + filename;
-		// Try to use local shader instead if asked to
-		if(prefer_local){
+		// If it exists locally, don't insert
+		if (prefer_local) {
 			std::string path = getShaderPath(name_of_shader, filename);
-			if(!path.empty()){
-				std::string p = readFile(path);
-				if (!p.empty()) {
-					m_programs[combined] = p;
-					return;
-				}
-			}
+			if (!path.empty())
+				return;
 		}
 		m_programs[combined] = program;
 	}
@@ -107,7 +102,7 @@ public:
 		const std::string &filename)
 	{
 		std::string combined = name_of_shader + DIR_DELIM + filename;
-		StringMap::iterator n = m_programs.find(combined);
+		auto n = m_programs.find(combined);
 		if (n != m_programs.end())
 			return n->second;
 		return "";
@@ -118,19 +113,19 @@ public:
 		const std::string &filename)
 	{
 		std::string combined = name_of_shader + DIR_DELIM + filename;
-		StringMap::iterator n = m_programs.find(combined);
+		auto n = m_programs.find(combined);
 		if (n != m_programs.end())
 			return n->second;
 		std::string path = getShaderPath(name_of_shader, filename);
 		if (path.empty()) {
-			infostream << "SourceShaderCache::getOrLoad(): No path found for \""
+			tracestream << "SourceShaderCache::getOrLoad(): No path found for \""
 				<< combined << "\"" << std::endl;
 			return "";
 		}
-		infostream << "SourceShaderCache::getOrLoad(): Loading path \""
-			<< path << "\"" << std::endl;
 		std::string p = readFile(path);
 		if (!p.empty()) {
+			infostream << "SourceShaderCache::getOrLoad(): Loaded " << p.size()
+				<< " bytes from path \"" << path << "\"" << std::endl;
 			m_programs[combined] = p;
 			return p;
 		}
@@ -635,15 +630,16 @@ void ShaderSource::rebuildShaders()
 	// Delete materials
 	auto *gpu = RenderingEngine::get_video_driver()->getGPUProgrammingServices();
 	assert(gpu);
+	size_t n = 0;
 	for (ShaderInfo &i : m_shaderinfo_cache) {
 		if (!i.name.empty()) {
 			gpu->deleteShaderMaterial(i.material);
 			i.material = video::EMT_INVALID;
+			n++;
 		}
 	}
 
-	infostream << "ShaderSource: recreating " << m_shaderinfo_cache.size()
-			<< " shaders" << std::endl;
+	infostream << "ShaderSource: recreating " << n << " shaders" << std::endl;
 
 	// Recreate shaders
 	for (ShaderInfo &i : m_shaderinfo_cache) {
@@ -847,14 +843,14 @@ void ShaderSource::generateShader(ShaderInfo &shaderinfo)
 	auto cb = make_irr<ShaderCallback>(name, m_uniform_factories);
 	cb->setExtraSetter(shaderinfo.setter_cb.get());
 
-	infostream << "Compiling high level shaders for " << log_name << std::endl;
+	infostream << "Compiling shaders for " << log_name << std::endl;
 	s32 shadermat = gpu->addHighLevelShaderMaterial(
 		vertex_shader.c_str(), fragment_shader.c_str(), geometry_shader_ptr,
 		log_name.c_str(), scene::EPT_TRIANGLES, scene::EPT_TRIANGLES, 0,
 		cb.get(), shaderinfo.base_material);
 	if (shadermat == -1) {
 		errorstream << "generateShader(): failed to generate shaders for "
-			<< log_name << ", addHighLevelShaderMaterial failed." << std::endl;
+			<< log_name << std::endl;
 		dumpShaderProgram(warningstream, "vertex", vertex_shader);
 		dumpShaderProgram(warningstream, "fragment", fragment_shader);
 		if (geometry_shader_ptr)
@@ -874,20 +870,12 @@ void ShaderSource::generateShader(ShaderInfo &shaderinfo)
 
 u32 IShaderSource::getShader(const std::string &name,
 	MaterialType material_type, NodeDrawType drawtype,
-	bool array_texture, bool skinning)
+	const ShaderFeatures &features)
 {
 	ShaderConstants input_const;
 	input_const["MATERIAL_TYPE"] = (int)material_type;
 	(void) drawtype; // unused
-	if (array_texture)
-		input_const["USE_ARRAY_TEXTURE"] = 1;
-	if (skinning) {
-		const auto max_joints = RenderingEngine::get_video_driver()->getMaxJointTransforms();
-		if (max_joints > 0) {
-			input_const["USE_SKINNING"] = 1;
-			input_const["MAX_JOINTS"] = max_joints;
-		}
-	}
+	features.setConstants(input_const);
 
 	video::E_MATERIAL_TYPE base_mat = video::EMT_SOLID;
 	switch (material_type) {
@@ -909,6 +897,19 @@ u32 IShaderSource::getShader(const std::string &name,
 	}
 
 	return getShader(name, input_const, base_mat);
+}
+
+void ShaderFeatures::setConstants(ShaderConstants &consts) const
+{
+	if (array_texture)
+		consts["USE_ARRAY_TEXTURE"] = 1;
+	if (skinning) {
+		const auto max_joints = RenderingEngine::get_video_driver()->getMaxJointTransforms();
+		if (max_joints > 0) {
+			consts["USE_SKINNING"] = 1;
+			consts["MAX_JOINTS"] = (int)max_joints;
+		}
+	}
 }
 
 void dumpShaderProgram(std::ostream &os,

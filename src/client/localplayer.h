@@ -17,14 +17,6 @@ class Map;
 struct CollisionInfo;
 struct CollisionMoveResult;
 
-enum class LocalPlayerAnimation
-{
-	NO_ANIM,
-	WALK_ANIM,
-	DIG_ANIM,
-	WD_ANIM // walking + digging
-};
-
 struct PlayerSettings
 {
 	bool free_move = false;
@@ -105,13 +97,15 @@ public:
 	float hurt_tilt_timer = 0.0f;
 	float hurt_tilt_strength = 0.0f;
 
+	PlayerHud csm_hud;
+
 	GenericCAO *getCAO() const { return m_cao; }
 
 	ClientActiveObject *getParent() const;
 
 	void setCAO(GenericCAO *toset)
 	{
-		assert(!m_cao); // Pre-condition
+		assert(!m_cao || !toset);
 		m_cao = toset;
 	}
 

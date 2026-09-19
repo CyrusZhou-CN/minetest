@@ -32,8 +32,8 @@ local function register_formspec(dialogdata)
 
 	table.insert_all(retval, {
 		"container[0.375,", tostring(buttons_y), "]",
-		"button[0,0;2.5,0.8;dlg_register_confirm;", fgettext("Register"), "]",
-		"button[4.75,0;2.5,0.8;dlg_register_cancel;", fgettext("Cancel"), "]",
+		"button[0,0;2.5,0.8;dlg_register_cancel;", fgettext("Cancel"), "]",
+		"button[4.75,0;2.5,0.8;dlg_register_confirm;", fgettext("Register"), "]",
 		"container_end[]",
 	})
 
@@ -55,6 +55,7 @@ local function register_buttonhandler(this, fields)
 			return true
 		end
 
+		gamedata.mode       = "join"
 		gamedata.playername = fields.name
 		gamedata.password   = fields.password
 		gamedata.address    = this.data.address
@@ -67,12 +68,7 @@ local function register_buttonhandler(this, fields)
 		local server = this.data.server
 		if server then
 			serverlistmgr.add_favorite(server)
-			gamedata.servername        = server.name
-			gamedata.serverdescription = server.description
 		else
-			gamedata.servername        = ""
-			gamedata.serverdescription = ""
-
 			serverlistmgr.add_favorite({
 				address = gamedata.address,
 				port = gamedata.port,
