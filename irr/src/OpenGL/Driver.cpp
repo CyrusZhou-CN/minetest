@@ -339,19 +339,13 @@ void COpenGL3DriverBase::loadShaderData(const io::path &vertexShaderName, const 
 
 	io::IReadFile *vsFile = FileSystem->createAndOpenFile(vsPath);
 	if (!vsFile) {
-		std::string warning("Warning: Missing shader files needed to simulate fixed function materials:\n");
-		warning.append(vsPath.c_str()).append("\n");
-		warning += "Shaderpath can be changed in SIrrCreationParamters::OGLES2ShaderPath";
-		os::Printer::log(warning.c_str(), ELL_WARNING);
+		os::Printer::log("Missing vertex shader file", vsPath, ELL_ERROR);
 		return;
 	}
 
 	io::IReadFile *fsFile = FileSystem->createAndOpenFile(fsPath);
 	if (!fsFile) {
-		std::string warning("Warning: Missing shader files needed to simulate fixed function materials:\n");
-		warning.append(fsPath.c_str()).append("\n");
-		warning += "Shaderpath can be changed in SIrrCreationParamters::OGLES2ShaderPath";
-		os::Printer::log(warning.c_str(), ELL_WARNING);
+		os::Printer::log("Missing fragment shader file", fsPath, ELL_ERROR);
 		return;
 	}
 
@@ -1478,6 +1472,8 @@ void COpenGL3DriverBase::setRenderStates2DMode(bool alpha, bool texture, bool al
 
 	COpenGL3Renderer2D *nextActiveRenderer = texture ? MaterialRenderer2DTexture : MaterialRenderer2DNoTexture;
 
+	bool mode_changed = false;
+
 	if (CurrentRenderMode != ERM_2D) {
 		// unset last 3d material
 		if (CurrentRenderMode == ERM_3D) {
@@ -1485,6 +1481,7 @@ void COpenGL3DriverBase::setRenderStates2DMode(bool alpha, bool texture, bool al
 				MaterialRenderers[LastMaterial.MaterialType].Renderer->OnUnsetMaterial();
 		}
 
+		mode_changed = true;
 		CurrentRenderMode = ERM_2D;
 	} else if (MaterialRenderer2DActive && MaterialRenderer2DActive != nextActiveRenderer) {
 		MaterialRenderer2DActive->OnUnsetMaterial();
@@ -1492,7 +1489,7 @@ void COpenGL3DriverBase::setRenderStates2DMode(bool alpha, bool texture, bool al
 
 	MaterialRenderer2DActive = nextActiveRenderer;
 
-	MaterialRenderer2DActive->OnSetMaterial(Material, LastMaterial, true, 0);
+	MaterialRenderer2DActive->OnSetMaterial(Material, LastMaterial, mode_changed, 0);
 	LastMaterial = Material;
 	CacheHandler->correctCacheMaterial(LastMaterial);
 

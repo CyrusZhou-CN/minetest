@@ -33,6 +33,8 @@
 
 #include <algorithm>
 
+static constexpr std::size_t MAX_CLIENT_MOD_CHANNELS = 128;
+
 void Server::handleCommand_Deprecated(NetworkPacket* pkt)
 {
 	auto &h = toServerCommandTable[pkt->getCommand()];
@@ -305,16 +307,6 @@ void Server::handleCommand_Init2(NetworkPacket* pkt)
 
 	// Keep client language for server translations
 	client->setLangCode(lang);
-
-	// Send active objects
-	{
-		PlayerSAO *sao = getPlayerSAO(peer_id);
-		if (sao)
-			SendActiveObjectRemoveAdd(client, sao);
-	}
-
-	// Send detached inventories
-	sendDetachedInventories(peer_id, false);
 
 	// Send player movement settings
 	SendMovement(peer_id);
@@ -1307,6 +1299,18 @@ void Server::handleCommand_NodeMetaFields(NetworkPacket* pkt)
 		return;
 	}
 
+	if (!checkPriv(player->getName(), "interact")) {
+		actionstream << player->getName() << " attempted to interact with "
+				<< "node metadata at " << p << " without 'interact' privilege"
+				<< std::endl;
+		return;
+	}
+
+	v3f node_pos = intToFloat(p, BS);
+	f32 d = playersao->getEyePosition().getDistanceFrom(node_pos);
+	if (!checkInteractDistance(player, d, "node metadata"))
+		return;
+
 	// If something goes wrong, this player is to blame
 	RollbackScopeActor rollback_scope(m_rollback,
 			"player:" + player->getName());
@@ -1675,15 +1679,16 @@ void Server::handleCommand_ModChannelJoin(NetworkPacket *pkt)
 
 	// Send signal to client to notify join succeed or not
 	if (g_settings->getBool("enable_mod_channels") &&
-			m_modchannel_mgr->joinChannel(channel_name, peer_id)) {
+			m_modchannel_mgr->joinChannel(channel_name, peer_id,
+					MAX_CLIENT_MOD_CHANNELS)) {
 		resp_pkt << (u8) MODCHANNEL_SIGNAL_JOIN_OK;
 		infostream << "Peer " << peer_id << " joined channel " <<
 			channel_name << std::endl;
 	}
 	else {
 		resp_pkt << (u8)MODCHANNEL_SIGNAL_JOIN_FAILURE;
-		infostream << "Peer " << peer_id << " tried to join channel " <<
-			channel_name << ", but was already registered." << std::endl;
+		infostream << "Peer " << peer_id << " could not join channel " <<
+			channel_name << std::endl;
 	}
 	resp_pkt << channel_name;
 	Send(&resp_pkt);

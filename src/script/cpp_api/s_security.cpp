@@ -738,10 +738,10 @@ bool ScriptApiSecurity::safeLoadFile(lua_State *L, const char *path, const char 
 
 	// Check sha256 if it's a builtin file
 	do {
-		assert(path != nullptr);
 		auto path_local = fs::MakePathRelativeTo(path, Server::getBuiltinLuaPath());
 		if (path_local.empty())
 			break; // not in builtin
+		str_replace(path_local, DIR_DELIM_CHAR, '/');
 
 		auto it = g_builtin_file_sha256_map.find(path_local);
 		if (it == g_builtin_file_sha256_map.end()) {
@@ -1102,7 +1102,7 @@ int ScriptApiSecurity::sl_io_open(lua_State *L)
 		plus   = mode.find('+') != mode.npos;
 		append = mode.find('a') != mode.npos;
 		binary = mode.find('b') != mode.npos;
-		if (mode.find_first_not_of("rw+ab") != mode.npos)
+		if (mode.find_first_not_of("rw+abt") != mode.npos)
 			throw LuaError("Invalid file mode");
 	}
 	CHECK_SECURE_PATH_INTERNAL(L, path, write || plus || append, NULL);

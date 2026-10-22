@@ -419,6 +419,8 @@ static void set_allowed_options(OptionList *allowed_options)
 			_("Enable ncurses interactive terminal" SERVER_ONLY))));
 	allowed_options->insert(std::make_pair("recompress", ValueSpec(VALUETYPE_FLAG,
 			_("Recompress the blocks of the given map database" SERVER_ONLY))));
+	allowed_options->emplace("insecure-no-sandbox", ValueSpec(VALUETYPE_FLAG,
+			_("Disable server Lua sandbox (INSECURE!)")));
 #if CHECK_CLIENT_BUILD()
 	allowed_options->insert(std::make_pair("address", ValueSpec(VALUETYPE_STRING,
 			_("Address to connect to ('' = local game)"))));
@@ -788,7 +790,8 @@ static bool init_common(const Settings &cmd_args, int argc, char *argv[])
 	srand(seed);
 	mysrand(seed);
 
-	// Initialize HTTP fetcher
+	g_disable_mod_security = cmd_args.getFlag("insecure-no-sandbox");
+
 	httpfetch_init(g_settings->getS32("curl_parallel_limit"));
 
 	init_gettext(porting::path_locale.c_str(),
@@ -1212,9 +1215,8 @@ static bool run_dedicated_server(const GameParams &game_params, const Settings &
 		volatile auto &kill = *porting::signal_handler_killstatus();
 
 		try {
-			// Create server
 			Server server(game_params.world_path, game_params.game_spec,
-					false, bind_addr, true, &iface);
+					false, UDPSocket::Create(bind_addr), true, &iface);
 
 			g_term_console.setup(&iface, &kill, admin_nick);
 
@@ -1230,6 +1232,10 @@ static bool run_dedicated_server(const GameParams &game_params, const Settings &
 		} catch (const ServerError &e) {
 			g_term_console.stopAndWaitforThread();
 			errorstream << "ServerError: " << e.what() << std::endl;
+			return false;
+		} catch (const SocketException &e) {
+			g_term_console.stopAndWaitforThread();
+			errorstream << "SocketException: " << e.what() << std::endl;
 			return false;
 		}
 
@@ -1248,7 +1254,7 @@ static bool run_dedicated_server(const GameParams &game_params, const Settings &
 		try {
 			// Create server
 			Server server(game_params.world_path, game_params.game_spec, false,
-				bind_addr, true);
+					UDPSocket::Create(bind_addr), true);
 			server.start();
 
 			// Run server
@@ -1260,6 +1266,9 @@ static bool run_dedicated_server(const GameParams &game_params, const Settings &
 			return false;
 		} catch (const ServerError &e) {
 			errorstream << "ServerError: " << e.what() << std::endl;
+			return false;
+		} catch (SocketException &e) {
+			errorstream << "SocketException: " << e.what() << std::endl;
 			return false;
 		}
 	}
@@ -1365,7 +1374,8 @@ static bool recompress_map_database(const GameParams &game_params, const Setting
 		return false;
 	}
 	const std::string &backend = world_mt.get("backend");
-	Server server(game_params.world_path, game_params.game_spec, false, Address(), false);
+	Server server(game_params.world_path, game_params.game_spec, false,
+			UDPSocket::CreateEphemeral(false), false);
 	MapDatabase *db = ServerMap::createDatabase(backend, game_params.world_path, world_mt);
 
 	volatile auto &kill = *porting::signal_handler_killstatus();

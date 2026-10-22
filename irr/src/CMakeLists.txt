@@ -18,8 +18,7 @@ endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$")
-	set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-	set(CMAKE_CXX_FLAGS_DEBUG "-g")
+	# don't set CMAKE_CXX_FLAGS_* here, it would override what Luanti already sets
 
 	add_compile_options(-Wall -pipe)
 
@@ -35,7 +34,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$")
 	endif()
 
 	# Enable SSE for floating point math on 32-bit x86 by default
-	# reasoning see minetest issue #11810 and https://gcc.gnu.org/wiki/FloatingPointMath
+	# reasoning see luanti issue #11810 and https://gcc.gnu.org/wiki/FloatingPointMath
 	if(CMAKE_SIZEOF_VOID_P EQUAL 4)
 		check_cxx_source_compiles("#ifndef __i686__\n#error\n#endif\nint main(){}" IS_I686)
 		if(IS_I686)
@@ -60,7 +59,7 @@ elseif(MSVC)
 	add_compile_options(/Zl)
 
 	# Enable SSE for floating point math on 32-bit x86 by default
-	# reasoning see minetest issue #11810 and https://gcc.gnu.org/wiki/FloatingPointMath
+	# reasoning see luanti issue #11810 and https://gcc.gnu.org/wiki/FloatingPointMath
 	if(CMAKE_SIZEOF_VOID_P EQUAL 4)
 		add_compile_options(/arch:SSE)
 	endif()
@@ -377,7 +376,6 @@ add_library(IRRIOOBJ OBJECT
 	CMemoryFile.h
 	CReadFile.h
 	CWriteFile.h
-	CZipReader.h
 
 	CFileList.cpp
 	CFileSystem.cpp
@@ -385,7 +383,6 @@ add_library(IRRIOOBJ OBJECT
 	CMemoryFile.cpp
 	CReadFile.cpp
 	CWriteFile.cpp
-	CZipReader.cpp
 )
 
 add_library(IRROTHEROBJ OBJECT

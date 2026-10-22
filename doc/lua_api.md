@@ -3096,6 +3096,8 @@ Formspec Version History
 * Version 11 (5.17.0)
   * Added hypertip[] element
   * label[], textarea[] and field[] alignment styles
+* Version 12 (5.18.0)
+  * `editable` style
 
 
 Elements
@@ -3747,7 +3749,7 @@ Elements
 * `state` is a list of states separated by the `+` character.
     * If a state is provided, the style will only take effect when the element is in that state.
     * All provided states must be active for the style to apply.
-* Note: this **must** be before the element is defined.
+* Styles are evaluated in-order during parsing, so this definition will only apply to **following** elements.
 * See [Styling Formspecs](#styling-formspecs).
 
 
@@ -3760,6 +3762,7 @@ Elements
 * `state` is a list of states separated by the `+` character.
     * If a state is provided, the style will only take effect when the element is in that state.
     * All provided states must be active for the style to apply.
+* Styles are evaluated in-order during parsing, so this definition will only apply to **following** elements.
 * See [Styling Formspecs](#styling-formspecs).
 
 ### `set_focus[<name>;<force>]`
@@ -3943,9 +3946,11 @@ Some types may inherit styles from parent types.
 * checkbox
     * noclip - boolean, set to true to allow the element to exceed formspec bounds.
     * sound - a sound to be played when triggered.
+    * editable - set to false to make the element read-only (default: true)
 * dropdown
     * noclip - boolean, set to true to allow the element to exceed formspec bounds.
     * sound - a sound to be played when the entry is changed.
+    * editable - set to false to make the element read-only (default: true)
 * field, pwdfield, textarea
     * border - set to false to hide the textbox background and border. Default true.
     * font - Sets font type. See button `font` property for more information.
@@ -3957,6 +3962,7 @@ Some types may inherit styles from parent types.
     **Note**: `valign` only has an effect when the text fits completely inside the element vertically.
     If the text is too long (and a scrollbar appears in `textarea[]`), it is forced to `top` alignment
     to prevent text being cut off. `valign` also does not work in `field[]`, however `halign` does.
+    * editable - set to false to make the field read-only (default: true)
 * model
     * bgcolor - color, sets background color.
     * noclip - boolean, set to true to allow the element to exceed formspec bounds.
@@ -4926,6 +4932,33 @@ msgctxt "textdomain"
 msgid "Hello world!"
 msgstr "Bonjour le monde!"
 ```
+
+Monolingual Translations (Non-English Source Locale)
+----------------------------------------------------
+
+By default, Luanti assumes that the source strings in mods are written in English.
+Starting from version 5.18.0, mod developers can specify any source language for
+their mod by writing the original source strings in that language.
+
+To declare the source language, you must add a `X-Source-Language` field
+to the **English** translation file (specifying the source language in files
+for other locales will be ignored).
+
+For `.po` and `.mo` files, the source language is specified in the header entry:
+```po
+msgid ""
+msgstr ""
+"X-Source-Language: de\n"
+```
+
+For the old `.tr` format, add a comment immediately after the `textdomain` declaration:
+```text
+# textdomain: mymod
+# X-Source-Language: de
+```
+
+**Note:** Starting from version 5.18.0, the English translation is provided [server] and
+used [client] as a fallback if no specific translation is available for the current language.
 
 Escapes
 -------
@@ -6988,8 +7021,14 @@ Environment access
     * Currently it's the same as `math.floor(param1 / 16)`, except that it
       ensures compatibility.
 * `core.place_node(pos, node[, placer])`
-    * Place node with the same effects that a player would cause
+    * Calls the `on_place` function of a node definition
+    * `pos`: Specifies placement position for `on_place` (see below)
+    * `node`: Node table of the node to place (`param1`/`param2` are ignored)
     * `placer`: The ObjectRef that places the node (optional)
+    * These arguments will be passed to `on_place`:
+        * `itemstack = ItemStack(node.name)`
+        * `placer = placer`
+        * `pointed_thing = { type = "node", above = pos, under = vector.offset(pos, 0, -1, 0) }`
 * `core.dig_node(pos[, digger])`
     * Dig node with the same effects that a player would cause
     * `digger`: The ObjectRef that digs the node (optional)
@@ -8158,7 +8197,10 @@ Misc.
 * `core.hash_node_position(pos)`: returns an integer in range [0, 2^48-1]
     * `pos`: table {x=integer [s16], y=integer [s16], z=integer [s16]},
     * Gives a unique numeric encoding for a node position (16+16+16=48bit)
-    * Despite the name, this is not a hash function (so it doesn't mix or produce collisions).
+    * This function is better described as an encoding rather than a "true" hash function
+    * Output values follow a particular order, they're not mixed
+    * This operation is fully reversible (see below)
+    * It's probably a bad idea to seed random number generators with this
 * `core.get_position_from_hash(hash)`: returns a position
     * Inverse transform of `core.hash_node_position`
 * `core.get_item_group(name, group)`: returns a rating
@@ -9719,7 +9761,7 @@ You **must not** mix names and track numbers to refer to the same animation.
           The default is a zero vector and disables the override.
           Note: the vector points "outwards" so that `(0, 1, 0)` is equivalent to
           the sun at midday shining straight down.
-      * `exposure` is a table that controls automatic exposure.
+      * `exposure` is a table that controls automatic exposure
         The basic exposure factor equation is `e = 2^exposure_correction / clamp(luminance, 2^luminance_min, 2^luminance_max)`
         * This has no effect on clients who have the "Automatic Exposure" effect disabled.
         * `luminance_min` set the lower luminance boundary to use in the calculation (default: `-3.0`)
@@ -9743,13 +9785,23 @@ You **must not** mix names and track numbers to refer to the same animation.
           spreads from the bright objects.
           * Recommended range: from 0.1 to 8.0, default: 1.0
         * The behavior of values outside the recommended range is unspecified.
-      * `volumetric_light`: is a table that controls volumetric light (a.k.a. "godrays")
+      * `volumetric_light` is a table that controls volumetric light (a.k.a. "godrays")
         * This has no effect on clients who have the "Volumetric Lighting" or "Bloom" effects disabled.
         * `strength`: sets the strength of the volumetric light effect from 0 (off, default) to 1 (strongest).
             * `0.2` is a reasonable standard value.
             * Currently, bloom `intensity` and `strength_factor` affect volumetric
               lighting `strength` and vice versa. This behavior is to be changed
               in the future, do not rely on it.
+      * `static` is a table that controls static world lighting
+        * (added in 5.18.0, no client setting requirements)
+        * Note that changing these parameters is an expensive operation for the client.
+        * `light_curve`: LUT that converts light values (0-15) to brightness (0-255)
+          * table containing 16 numbers or an empty table to reset to the default
+          * The values should be monotonically increasing and the last value should
+            be 255. Otherwise there might be lighting bugs.
+        * `ao_gamma`: Strength of node ambient-occlusion shading. Lower is darker, Higher is lighter.
+          * Recommended range: from 0.25 to 3.0, default: 1.8
+          * A value of 0.0 will disable this shading entirely.
 
 * `get_lighting()`: returns the current state of lighting for the player.
     * Result is a table with the same fields as `light_definition` in `set_lighting`.
